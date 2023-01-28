@@ -1,0 +1,114 @@
+/**
+ * This example turns the ESP32 into a Bluetooth LE mouse that continuously moves the mouse.
+ */
+ #include <Wire.h>
+#include <BleMouse.h>
+#include <MPU6050_tockn.h>
+
+
+MPU6050 mpu6050(Wire);
+#define BLOCK_Mouse_BUTTON 13
+#define  Trigger_BUTTON  23
+BleMouse bleMouse;
+//int mouseMoveX,mouseMoveY;
+
+//float mpuMovementMultiplierX=-1.5;
+//float mpuMovementMultiplierY=-1.8;
+
+int gyrointerval = 10;
+//int x_CIMA,x_BAIXO,y_ESQUERDA,y_DIREITA;
+int previousTrigger_BUTTON = HIGH;
+
+unsigned long current_millis, last_millis = 0;
+void setup() {
+  pinMode(BLOCK_Mouse_BUTTON,INPUT_PULLUP);
+  pinMode(Trigger_BUTTON,INPUT_PULLUP);
+  Serial.begin(115200);
+  Wire.begin(21,22,0x68 );//sda,scl e endereço do mpu
+  Wire. setClock ( 400000);
+  mpu6050.begin();
+ mpu6050.calcGyroOffsets(true);
+  Serial.println("Starting BLE work!");
+  bleMouse.begin();
+}
+
+void loop() {
+    current_millis = millis();//marca tempo
+  if(bleMouse.isConnected()) {
+    if (current_millis - last_millis > gyrointerval) {   //Se a diferença entre os dois ultimos ciclos for maior que o intervalo de leitura do giróscopio....
+     mpu6050.update();
+      //static float LAST_ANGLE_X = 0, LAST_ANGLE_Y = 0 ;
+ static int x = 0, y = 0;
+ // bool mpuValidX = true, mpuValidY = true;
+
+x=mpu6050.getGyroY()/80;//valor de correção do giroscópio
+y=mpu6050.getGyroZ()/80;
+
+  
+    
+ if(digitalRead(BLOCK_Mouse_BUTTON) == 0)
+  {
+    x=0;
+    y=0;
+  
+  }
+  
+
+
+
+ int8_t  mouseMove[2]={x,y};
+ for(int i=0;i<2;i++)
+ {
+   mouseMove[i]= mouseMove[i]*6;
+ }
+
+ // Calculate +/- signs beforehand to save cycles
+  int8_t mouseSign[2] = {1, 1}; //
+  for(int i = 0; i < 2; i++){
+    // Single if statement faster than x/|x|
+    if(mouseMove[i] < 0){
+      mouseSign[i] = -1;
+    }
+  }
+  while((mouseMove[0] != 0 || mouseMove[1] != 0) ) {
+  int8_t mouseUpdate[2];//
+    
+    for(int i = 0; i < 2; i++){
+      if(abs(mouseMove[i]) >= 127){
+        mouseUpdate[i] = 127 * mouseSign[i];
+        mouseMove[i] = (abs(mouseMove[i]) - 127) * mouseSign[i];
+      }
+      else if(abs(mouseMove[i]) > 0){
+        mouseUpdate[i] = (int8_t) mouseMove[i];//(int8_t)
+        mouseMove[i] = 0;
+      }
+      else{
+        mouseUpdate[i] = 0;
+      }
+    }
+    bleMouse.move(-mouseUpdate[0], mouseUpdate[1]);
+  }
+  last_millis = current_millis;
+    }
+int currentTrigger_BUTTON = digitalRead(Trigger_BUTTON);
+
+if (currentTrigger_BUTTON != previousTrigger_BUTTON) {
+      if (currentTrigger_BUTTON == LOW)
+       bleMouse.press(MOUSE_LEFT);
+      else
+       bleMouse.release(MOUSE_LEFT);
+    }
+    previousTrigger_BUTTON = currentTrigger_BUTTON;
+
+    delay(5);
+  }
+
+
+
+  
+
+  }
+
+
+ 
+ 
